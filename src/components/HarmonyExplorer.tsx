@@ -1,9 +1,9 @@
-import React from "react";
+import type React from "react";
 
 const HarmonyExplorer: React.FC = () => {
 	return (
 		<div className="w-full h-[400px] bg-[#17161b] rounded-3xl border border-white/10 flex items-center justify-center relative overflow-hidden group">
-			<div className="absolute inset-0 bg-gradient-to-b from-purple-900/10 to-transparent opacity-50"></div>
+			<div className="absolute inset-0 bg-gradient-t	o-b from-purple-900/10 to-transparent opacity-50"></div>
 
 			{/* Abstract representation of Circle of Fifths */}
 			<div className="relative w-64 h-64 rounded-full border border-white/10 animate-[spin_60s_linear_infinite]">
