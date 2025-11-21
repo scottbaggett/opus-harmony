@@ -3,6 +3,8 @@ import { type FC, useCallback, useEffect, useRef, useState } from "react";
 import { GameState } from "../types";
 import { gsap } from "gsap";
 import { PixiPlugin } from "gsap/PixiPlugin";
+import { soundEngine } from "../services/soundEngine";
+import { LEVELS, getCurrentLevelConfig, getNextLevel } from "../config/levels";
 
 // Register PixiPlugin
 gsap.registerPlugin(PixiPlugin);
@@ -27,10 +29,7 @@ const TREBLE_NOTES = [
 
 const STAFF_LINE_SPACING = 60;
 
-const NoteIdentificationGame: FC<NoteIdentificationGameProps> = ({
-	gameState,
-	onScoreUpdate,
-}) => {
+const NoteIdentificationGame: FC<NoteIdentificationGameProps> = ({ gameState, onScoreUpdate }) => {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const appRef = useRef<Application | null>(null);
 	const [isReady, setIsReady] = useState(false);
@@ -38,12 +37,9 @@ const NoteIdentificationGame: FC<NoteIdentificationGameProps> = ({
 	// Game state
 	const [level, setLevel] = useState(1);
 	const [availableNotes, setAvailableNotes] = useState<typeof TREBLE_NOTES>([]);
-	const [currentNote, setCurrentNote] = useState<
-		(typeof TREBLE_NOTES)[0] | null
-	>(null);
-	const [feedback, setFeedback] = useState<"correct" | "incorrect" | null>(
-		null,
-	);
+	const [currentNote, setCurrentNote] = useState<(typeof TREBLE_NOTES)[0] | null>(null);
+	const [feedback, setFeedback] = useState<"correct" | "incorrect" | null>(null);
+	const [showLevelUp, setShowLevelUp] = useState(false);
 
 	const scoreRef = useRef(0);
 	const streakRef = useRef(0);
@@ -60,46 +56,39 @@ const NoteIdentificationGame: FC<NoteIdentificationGameProps> = ({
 			setLevel(1);
 			setFeedback(null);
 			setCurrentNote(null); // Reset current note to trigger new note generation
+
+			// Initialize sound engine on first play
+			soundEngine.init().catch((err) => console.error("Failed to init audio:", err));
 		}
 	}, [gameState]);
 
-	// Update available notes based on level
+	// Update available notes based on level configuration
 	useEffect(() => {
-		if (level === 1) {
-			// Level 1: Only lines (E, G, B)
-			setAvailableNotes(
-				TREBLE_NOTES.filter((n) => [0, 2, 4].includes(n.position)),
-			);
-		} else {
-			// Level 2+: All notes
-			setAvailableNotes(TREBLE_NOTES);
-		}
+		const levelConfig = getCurrentLevelConfig(level);
+		const notesForLevel = TREBLE_NOTES.filter((n) => levelConfig.availableNotes.includes(n.position));
+		setAvailableNotes(notesForLevel);
+		console.log(`Level ${level}: ${levelConfig.name}`, notesForLevel);
 	}, [level]);
 
 	// Generate new note when available notes change or game starts
 	useEffect(() => {
 		console.log("Note generation check:", {
 			gameState,
-			availableNotesLength: availableNotes.length,
+			level,
+			availableNotes: availableNotes.map(n => n.name),
 			hasCurrentNote: !!currentNote,
 		});
-		if (
-			gameState === GameState.PLAYING &&
-			availableNotes.length > 0 &&
-			!currentNote
-		) {
-			console.log("Generating new note, available:", availableNotes);
-			const randomNote =
-				availableNotes[Math.floor(Math.random() * availableNotes.length)];
+		if (gameState === GameState.PLAYING && availableNotes.length > 0 && !currentNote) {
+			console.log("Generating new note from:", availableNotes.map(n => n.name));
+			const randomNote = availableNotes[Math.floor(Math.random() * availableNotes.length)];
 			console.log("Selected note:", randomNote);
 			setCurrentNote(randomNote);
 		}
-	}, [gameState, availableNotes.length, currentNote]);
+	}, [gameState, level, availableNotes.length, currentNote]);
 
 	const createNewNote = useCallback(() => {
 		if (availableNotes.length === 0) return;
-		const randomNote =
-			availableNotes[Math.floor(Math.random() * availableNotes.length)];
+		const randomNote = availableNotes[Math.floor(Math.random() * availableNotes.length)];
 		setCurrentNote(randomNote);
 	}, [availableNotes]);
 
@@ -146,12 +135,7 @@ const NoteIdentificationGame: FC<NoteIdentificationGameProps> = ({
 
 			// Staff glow
 			const staffGlow = new Graphics();
-			staffGlow.rect(
-				0,
-				startY - 20,
-				app.screen.width,
-				STAFF_LINE_SPACING * 4 + 40,
-			);
+			staffGlow.rect(0, startY - 20, app.screen.width, STAFF_LINE_SPACING * 4 + 40);
 			staffGlow.fill({ color: 0x000000, alpha: 0.3 });
 			const blur = new BlurFilter();
 			blur.strength = 10;
@@ -206,13 +190,7 @@ const NoteIdentificationGame: FC<NoteIdentificationGameProps> = ({
 			currentNote,
 			gameState,
 		});
-		if (
-			!isReady ||
-			!appRef.current ||
-			!currentNote ||
-			gameState !== GameState.PLAYING
-		)
-			return;
+		if (!isReady || !appRef.current || !currentNote || gameState !== GameState.PLAYING) return;
 
 		console.log("Drawing note:", currentNote);
 		const app = appRef.current;
@@ -227,10 +205,7 @@ const NoteIdentificationGame: FC<NoteIdentificationGameProps> = ({
 		const startY = centerY - 2 * STAFF_LINE_SPACING;
 
 		// Calculate note Y position
-		const noteY =
-			startY +
-			4 * STAFF_LINE_SPACING -
-			currentNote.position * (STAFF_LINE_SPACING / 2);
+		const noteY = startY + 4 * STAFF_LINE_SPACING - currentNote.position * (STAFF_LINE_SPACING / 2);
 
 		const noteContainer = new Container();
 		noteContainer.x = app.screen.width / 2;
@@ -303,6 +278,9 @@ const NoteIdentificationGame: FC<NoteIdentificationGameProps> = ({
 			yoyo: true,
 			ease: "sine.inOut",
 		});
+
+		// Play the note sound when it appears
+		soundEngine.playNote(currentNote.displayName, "2n");
 	}, [currentNote, isReady, gameState]);
 
 	// Feedback visual effect
@@ -401,12 +379,7 @@ const NoteIdentificationGame: FC<NoteIdentificationGameProps> = ({
 	// Keyboard input handler
 	useEffect(() => {
 		const handleKeyPress = (e: KeyboardEvent) => {
-			if (
-				gameStateRef.current !== GameState.PLAYING ||
-				feedback !== null ||
-				!currentNote
-			)
-				return;
+			if (gameStateRef.current !== GameState.PLAYING || feedback !== null || !currentNote) return;
 
 			const key = e.key.toUpperCase();
 			const validNotes = availableNotes.map((n) => n.name);
@@ -423,18 +396,16 @@ const NoteIdentificationGame: FC<NoteIdentificationGameProps> = ({
 	const handleNoteSelection = (selectedNote: string) => {
 		if (!currentNote || feedback !== null) return;
 
-		console.log(
-			"Note selected:",
-			selectedNote,
-			"Current note:",
-			currentNote.name,
-		);
+		console.log("Note selected:", selectedNote, "Current note:", currentNote.name);
 
 		if (selectedNote === currentNote.name) {
 			// Correct!
 			setFeedback("correct");
 			scoreRef.current += 10;
 			streakRef.current += 1;
+
+			// Play success sound - major 7th chord based on the note that was hit
+			soundEngine.playSuccess(currentNote.displayName);
 
 			// Animate note exit (success)
 			if (currentNoteGraphicRef.current) {
@@ -451,24 +422,43 @@ const NoteIdentificationGame: FC<NoteIdentificationGameProps> = ({
 				});
 			}
 
-			// Level up every 5 correct notes
-			if (streakRef.current % 5 === 0 && level < 2) {
-				setLevel((l) => l + 1);
+			// Check for level up based on score
+			const currentLevelConfig = getCurrentLevelConfig(level);
+			const nextLevelConfig = getNextLevel(level);
+
+			if (nextLevelConfig && scoreRef.current >= currentLevelConfig.requiredScore) {
+				console.log(`Level up! ${level} → ${nextLevelConfig.id}`);
+				// Show level up celebration
+				setShowLevelUp(true);
+
+				// Don't generate new note during level transition
+				setTimeout(() => {
+					setShowLevelUp(false);
+					setLevel(nextLevelConfig.id);
+					// Clear note AFTER level changes so new level's notes are used
+					setTimeout(() => {
+						setCurrentNote(null);
+						setFeedback(null);
+					}, 100);
+				}, 2000);
+			} else {
+				// Normal flow - clear current note to get next one
+				setTimeout(() => {
+					console.log("Clearing current note to trigger new note generation");
+					setCurrentNote(null); // Clear first
+					setFeedback(null); // Then clear feedback
+				}, 600);
 			}
 
 			onScoreUpdate(scoreRef.current, streakRef.current, level);
-
-			// Clear current note first, then set feedback to null after delay
-			setTimeout(() => {
-				console.log("Clearing current note to trigger new note generation");
-				setCurrentNote(null); // Clear first
-				setFeedback(null); // Then clear feedback
-			}, 600);
 		} else {
 			// Incorrect
 			setFeedback("incorrect");
 			streakRef.current = 0;
 			onScoreUpdate(scoreRef.current, 0, level);
+
+			// Play error sound
+			soundEngine.playError();
 
 			// Shake animation for wrong answer
 			if (currentNoteGraphicRef.current) {
@@ -499,6 +489,7 @@ const NoteIdentificationGame: FC<NoteIdentificationGameProps> = ({
 							type="button"
 							key={note.name}
 							onClick={() => handleNoteSelection(note.name)}
+							onMouseEnter={() => soundEngine.playNote(note.displayName, "32n")}
 							disabled={feedback !== null}
 							className="relative group animate-fade-in"
 							style={{
@@ -510,9 +501,7 @@ const NoteIdentificationGame: FC<NoteIdentificationGameProps> = ({
 							<div
 								className="absolute inset-0 blur-xl opacity-0 group-hover:opacity-50 transition-all duration-300 rounded-full"
 								style={{
-									backgroundColor: `#${note.color
-										.toString(16)
-										.padStart(6, "0")}`,
+									backgroundColor: `#${note.color.toString(16).padStart(6, "0")}`,
 								}}
 							/>
 
@@ -520,18 +509,13 @@ const NoteIdentificationGame: FC<NoteIdentificationGameProps> = ({
 							<div
 								className="relative w-20 h-20 rounded-full flex flex-col items-center justify-center shadow-lg transition-all duration-200 group-hover:scale-110 group-active:scale-95 group-hover:shadow-2xl"
 								style={{
-									backgroundColor: `#${note.color
-										.toString(16)
-										.padStart(6, "0")}`,
+									backgroundColor: `#${note.color.toString(16).padStart(6, "0")}`,
 									boxShadow: `0 0 0 2px rgba(${parseInt(
 										note.color.toString(16).slice(0, 2),
-										16,
-									)}, ${parseInt(
-										note.color.toString(16).slice(2, 4),
-										16,
-									)}, ${parseInt(
+										16
+									)}, ${parseInt(note.color.toString(16).slice(2, 4), 16)}, ${parseInt(
 										note.color.toString(16).slice(4, 6),
-										16,
+										16
 									)}, 0.3)`,
 								}}
 							>
@@ -553,6 +537,24 @@ const NoteIdentificationGame: FC<NoteIdentificationGameProps> = ({
 			{gameState === GameState.PLAYING && (
 				<div className="absolute bottom-4 left-0 right-0 text-center text-gray-500 text-sm pointer-events-none">
 					Click a button or press the letter key
+				</div>
+			)}
+
+			{/* Level Up Celebration */}
+			{showLevelUp && (
+				<div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-50 pointer-events-none animate-fade-in">
+					<div className="text-center space-y-4 animate-scale-in">
+						<div className="text-8xl">🎉</div>
+						<h2 className="text-6xl font-serif text-amber-400 drop-shadow-[0_0_20px_rgba(251,191,36,0.5)]">
+							Level Up!
+						</h2>
+						<p className="text-2xl text-gray-300">
+							{getNextLevel(level)?.name}
+						</p>
+						<p className="text-sm text-gray-500 uppercase tracking-widest">
+							{getNextLevel(level)?.description}
+						</p>
+					</div>
 				</div>
 			)}
 		</div>

@@ -1,11 +1,4 @@
-import {
-	Application,
-	BlurFilter,
-	Container,
-	Graphics,
-	Text,
-	TextStyle,
-} from "pixi.js";
+import { Application, BlurFilter, Container, Graphics, Text } from "pixi.js";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { COLORS } from "../constants";
@@ -21,7 +14,7 @@ interface SightReadingGameProps {
 const TREBLE_NOTES = ["E4", "F4", "G4", "A4", "B4", "C5", "D5", "E5", "F5"];
 // Visual Constants
 const STAFF_LINE_SPACING = 40;
-const SPEED_BASE = 4;
+const SPEED_BASE = 8;
 
 const SightReadingGame: React.FC<SightReadingGameProps> = ({
 	gameState,
@@ -55,7 +48,7 @@ const SightReadingGame: React.FC<SightReadingGameProps> = ({
 			streakRef.current = 0;
 			laneIndexRef.current = 4;
 			notesRef.current.forEach((n) => {
-				if (n.gfx && n.gfx.destroy) n.gfx.destroy();
+				if (n.gfx?.destroy) n.gfx.destroy();
 			});
 			notesRef.current = [];
 		}
@@ -115,12 +108,7 @@ const SightReadingGame: React.FC<SightReadingGameProps> = ({
 
 			// Staff Glow
 			const staffGlow = new Graphics();
-			staffGlow.rect(
-				0,
-				startY - 20,
-				app.screen.width,
-				STAFF_LINE_SPACING * 4 + 40,
-			);
+			staffGlow.rect(0, startY - 20, app.screen.width, STAFF_LINE_SPACING * 4 + 40);
 			staffGlow.fill({ color: 0x000000, alpha: 0.3 });
 			const blur = new BlurFilter();
 			blur.strength = 10;
@@ -268,7 +256,7 @@ const SightReadingGame: React.FC<SightReadingGameProps> = ({
 		};
 		window.addEventListener("keydown", handleKeyDown);
 		return () => window.removeEventListener("keydown", handleKeyDown);
-	}, []); // No deps needed as we use refs
+	}, [, spawnParticles, onScoreUpdate]); // No deps needed as we use refs
 
 	// --- GAME LOOP ---
 	useEffect(() => {
@@ -359,11 +347,11 @@ const SightReadingGame: React.FC<SightReadingGameProps> = ({
 		app.ticker.add(tickerCb);
 
 		return () => {
-			if (app && app.ticker) {
+			if (app?.ticker) {
 				app.ticker.remove(tickerCb);
 			}
 		};
-	}, [isReady]);
+	}, [isReady, spawnParticles, onScoreUpdate, spawnNote, onGameOver]);
 
 	// --- HELPERS ---
 
@@ -426,12 +414,7 @@ const SightReadingGame: React.FC<SightReadingGameProps> = ({
 		});
 	};
 
-	const spawnParticles = (
-		x: number,
-		y: number,
-		color: any,
-		layer: Container,
-	) => {
+	const spawnParticles = (x: number, y: number, color: any, layer: Container) => {
 		for (let i = 0; i < 12; i++) {
 			const p = new Graphics();
 			p.circle(0, 0, 3);

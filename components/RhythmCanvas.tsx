@@ -20,8 +20,7 @@ const RhythmCanvas: React.FC<RhythmCanvasProps> = ({ active }) => {
 	const [feedback, setFeedback] = useState<string | null>(null);
 
 	const level = INITIAL_RHYTHM_LEVEL;
-	const totalWidth =
-		level.notes[level.notes.length - 1].startTime * PIXELS_PER_BEAT + 800;
+	const totalWidth = level.notes[level.notes.length - 1].startTime * PIXELS_PER_BEAT + 800;
 
 	const animate = useCallback(
 		(time: number) => {
@@ -38,7 +37,7 @@ const RhythmCanvas: React.FC<RhythmCanvasProps> = ({ active }) => {
 				requestRef.current = requestAnimationFrame(animate);
 			}
 		},
-		[isPlaying, level.bpm, totalWidth],
+		[isPlaying, level.bpm, totalWidth]
 	);
 
 	useEffect(() => {
@@ -94,18 +93,14 @@ const RhythmCanvas: React.FC<RhythmCanvasProps> = ({ active }) => {
 			{/* Info Header */}
 			<div className="mb-6 flex justify-between items-end px-4">
 				<div>
-					<h2 className="text-2xl font-serif italic text-gray-200">
-						Rhythmic Patterns
-					</h2>
+					<h2 className="text-2xl font-serif italic text-gray-200">Rhythmic Patterns</h2>
 					<p className="text-gray-500 text-sm mt-1">
 						Visual representation of tempo and meter. Press [SPACE] to strike.
 					</p>
 				</div>
 				<div className="text-right">
 					<div className="text-4xl font-light text-purple-300">{score}</div>
-					<div className="text-xs text-gray-500 uppercase tracking-widest">
-						Score
-					</div>
+					<div className="text-xs text-gray-500 uppercase tracking-widest">Score</div>
 				</div>
 			</div>
 
@@ -131,8 +126,7 @@ const RhythmCanvas: React.FC<RhythmCanvasProps> = ({ active }) => {
 							key={i}
 							className="absolute top-0 bottom-0 border-r border-gray-500"
 							style={{
-								left:
-									i * PIXELS_PER_BEAT * 4 - (progress % (PIXELS_PER_BEAT * 4)),
+								left: i * PIXELS_PER_BEAT * 4 - (progress % (PIXELS_PER_BEAT * 4)),
 							}}
 						/>
 					))}
