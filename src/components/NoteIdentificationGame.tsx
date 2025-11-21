@@ -45,6 +45,7 @@ const NoteIdentificationGame: FC<NoteIdentificationGameProps> = ({ gameState, on
 	const streakRef = useRef(0);
 	const currentNoteGraphicRef = useRef<Container | null>(null);
 	const feedbackLayerRef = useRef<Container | null>(null);
+	const greenFlashRef = useRef<HTMLDivElement | null>(null);
 
 	const gameStateRef = useRef(gameState);
 	useEffect(() => {
@@ -175,7 +176,7 @@ const NoteIdentificationGame: FC<NoteIdentificationGameProps> = ({ gameState, on
 			if (currentNoteGraphicRef.current) {
 				gsap.to(currentNoteGraphicRef.current, {
 					pixi: { x: currentNoteGraphicRef.current.x + 10 },
-					duration: 0.05,
+					duration: 0.07,
 					yoyo: true,
 					repeat: 5,
 					ease: "power1.inOut",
@@ -405,7 +406,7 @@ const NoteIdentificationGame: FC<NoteIdentificationGameProps> = ({ gameState, on
 					life: number;
 					maxLife: number;
 				}> = [];
-				const particleCount = 30 + Math.floor(Math.random() * 25); // Random between 30-54 particles
+				const particleCount = 30 + Math.floor(Math.random() * 105); // Random between 30-54 particles
 				// Use note position as center
 				const centerX = currentNoteGraphicRef.current?.x ?? app.screen.width / 2;
 				const centerY = currentNoteGraphicRef.current?.y ?? app.screen.height / 2;
@@ -413,8 +414,8 @@ const NoteIdentificationGame: FC<NoteIdentificationGameProps> = ({ gameState, on
 				const noteColor = currentNote?.color ?? 0x22c55e;
 
 				// Physics constants with more randomness
-				const gravity = 600 + Math.random() * 400; // Random gravity between 600-1000
-				const minSpeed = 200;
+				const gravity = 100 + Math.random() * 300; // Random gravity between 600-1000
+				const minSpeed = 500;
 				const maxSpeed = 700;
 				const rotationSpeedRange = 8; // More rotation variation
 
@@ -425,24 +426,21 @@ const NoteIdentificationGame: FC<NoteIdentificationGameProps> = ({ gameState, on
 					// Random speed across full range
 					const speed = minSpeed + Math.random() * (maxSpeed - minSpeed);
 					// More size variation
-					const size = 5 + Math.random() * 18; // Random size between 5-23
+					const size = 1 + Math.random() * 7; // Random size between 5-23
 					// Random initial position spread around center
-					const initialSpread = 20;
+					const initialSpread = 50;
 					const startX = centerX + (Math.random() - 0.5) * initialSpread;
 					const startY = centerY + (Math.random() - 0.5) * initialSpread;
 					// Random upward bias
-					const upwardBias = -50 - Math.random() * 150;
+					const upwardBias = 50 - Math.random() * 150;
 
 					// Random shape (circle, square, or triangle)
 					const shapeType = Math.random();
 					const particle = new Graphics();
 
-					if (shapeType < 0.4) {
+					if (shapeType < 0.74) {
 						// Circle
 						particle.circle(0, 0, size);
-					} else if (shapeType < 0.8) {
-						// Square
-						particle.rect(-size, -size, size * 2, size * 2);
 					} else {
 						// Triangle
 						const points = [
@@ -504,7 +502,7 @@ const NoteIdentificationGame: FC<NoteIdentificationGameProps> = ({ gameState, on
 
 						// Fade out based on life
 						p.life = 1 - progress;
-						p.graphic.alpha = p.life * 0.9;
+						p.graphic.alpha = p.life * 0.94;
 
 						// Scale down as it fades
 						p.graphic.scale.set(p.life);
@@ -529,27 +527,27 @@ const NoteIdentificationGame: FC<NoteIdentificationGameProps> = ({ gameState, on
 
 				animationId = requestAnimationFrame(animate);
 
-				// Gentle flash overlay using note color
-				const overlay = new Graphics();
-				overlay.rect(0, 0, app.screen.width, app.screen.height);
-				overlay.fill({ color: noteColor, alpha: 0 });
-				feedbackLayer.addChild(overlay);
+				// Green flash overlay
+				// const overlay = new Graphics();
+				// overlay.rect(0, 0, app.screen.width, app.screen.height);
+				// overlay.fill({ color: 0x22c55e, alpha: 0 }); // Green color
+				// feedbackLayer.addChild(overlay);
 
-				gsap
-					.timeline()
-					.to(overlay, {
-						pixi: { alpha: 0.1 },
-						duration: 0.15,
-						ease: "power2.out",
-					})
-					.to(overlay, {
-						pixi: { alpha: 0 },
-						duration: 0.4,
-						ease: "power2.in",
-						onComplete: () => {
-							overlay.destroy();
-						},
-					});
+				// gsap
+				// 	.timeline()
+				// 	.to(overlay, {
+				// 		pixi: { alpha: 0.25 },
+				// 		duration: 0.15,
+				// 		ease: "power2.out",
+				// 	})
+				// 	.to(overlay, {
+				// 		pixi: { alpha: 0 },
+				// 		duration: 0.4,
+				// 		ease: "power2.in",
+				// 		onComplete: () => {
+				// 			overlay.destroy();
+				// 		},
+				// 	});
 			} else {
 				// Incorrect: Quick red flash
 				const overlay = new Graphics();
@@ -601,9 +599,38 @@ const NoteIdentificationGame: FC<NoteIdentificationGameProps> = ({ gameState, on
 		return () => window.removeEventListener("keypress", handleKeyPress);
 	}, [availableNotes, currentNote, feedback, handleNoteSelection]);
 
+	// Animate green flash overlay on success
+	useEffect(() => {
+		if (feedback === "correct" && greenFlashRef.current) {
+			gsap.killTweensOf(greenFlashRef.current);
+			gsap.set(greenFlashRef.current, { opacity: 0 });
+			gsap
+				.timeline()
+				.to(greenFlashRef.current, {
+					opacity: 0.25,
+					duration: 0.24,
+					ease: "expo.out",
+				})
+				.to(greenFlashRef.current, {
+					opacity: 0,
+					duration: 0.5,
+					ease: "expo.in",
+				});
+		}
+	}, [feedback]);
+
 	return (
 		<div className="absolute inset-0 w-full h-full">
-			<div ref={containerRef} className="absolute inset-0" />
+			{/* Green flash overlay behind everything */}
+			<div
+				ref={greenFlashRef}
+				className="absolute inset-0 bg-green-500 pointer-events-none"
+				style={{
+					zIndex: 0,
+					opacity: 0,
+				}}
+			/>
+			<div ref={containerRef} className="absolute inset-0" style={{ zIndex: 1 }} />
 
 			{/* Note selector buttons at bottom */}
 			{gameState === GameState.PLAYING && (
