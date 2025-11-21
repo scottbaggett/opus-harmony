@@ -1,8 +1,8 @@
 import { Application, BlurFilter, Container, Graphics, Text } from "pixi.js";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
-import { COLORS } from "../constants";
-import { GameState } from "../types";
+import { COLORS } from "../core/constants";
+import { GameState } from "../core/types";
 
 interface SightReadingGameProps {
 	gameState: GameState;
@@ -256,7 +256,7 @@ const SightReadingGame: React.FC<SightReadingGameProps> = ({
 		};
 		window.addEventListener("keydown", handleKeyDown);
 		return () => window.removeEventListener("keydown", handleKeyDown);
-	}, [, spawnParticles, onScoreUpdate]); // No deps needed as we use refs
+	}, []); // No deps needed as we use refs and inline functions
 
 	// --- GAME LOOP ---
 	useEffect(() => {
@@ -351,7 +351,7 @@ const SightReadingGame: React.FC<SightReadingGameProps> = ({
 				app.ticker.remove(tickerCb);
 			}
 		};
-	}, [isReady, spawnParticles, onScoreUpdate, spawnNote, onGameOver]);
+	}, [isReady]); // Helper functions are defined inline, callbacks are stable refs
 
 	// --- HELPERS ---
 

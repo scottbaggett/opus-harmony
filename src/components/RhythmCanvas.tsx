@@ -1,6 +1,7 @@
-import React, { useEffect, useRef, useState, useCallback } from "react";
-import { INITIAL_RHYTHM_LEVEL, COLORS } from "../constants";
-import { Note } from "../types";
+import type React from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { INITIAL_RHYTHM_LEVEL } from "../core/constants";
+import type { Note } from "../core/types";
 
 const CANVAS_HEIGHT = 400;
 const NOTE_SIZE = 50; // Width/Height of diamond
@@ -23,7 +24,7 @@ const RhythmCanvas: React.FC<RhythmCanvasProps> = ({ active }) => {
 	const totalWidth = level.notes[level.notes.length - 1].startTime * PIXELS_PER_BEAT + 800;
 
 	const animate = useCallback(
-		(time: number) => {
+		(_time: number) => {
 			if (isPlaying) {
 				setProgress((prev) => {
 					const speed = (level.bpm / 60) * PIXELS_PER_BEAT * 0.016; // Pixels per frame approx
@@ -57,7 +58,7 @@ const RhythmCanvas: React.FC<RhythmCanvasProps> = ({ active }) => {
 
 	const handleInteraction = () => {
 		// Simple hit detection logic
-		const playheadX = progress + 200; // Offset by playhead position
+		const _playheadX = progress + 200; // Offset by playhead position
 
 		// Find note closest to playhead
 		const hitNote = level.notes.find((n: Note) => {
@@ -86,7 +87,7 @@ const RhythmCanvas: React.FC<RhythmCanvasProps> = ({ active }) => {
 		};
 		window.addEventListener("keydown", handleKeyDown);
 		return () => window.removeEventListener("keydown", handleKeyDown);
-	}, [isPlaying, progress]);
+	}, [isPlaying, handleInteraction]);
 
 	return (
 		<div className="w-full relative select-none">

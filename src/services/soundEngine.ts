@@ -47,7 +47,7 @@ class SoundEngine {
 
 		// Parse the root note to get note name and octave
 		const noteName = rootNote.slice(0, -1); // e.g., "C", "E", "G#"
-		const octave = parseInt(rootNote.slice(-1)); // e.g., 4, 5
+		const octave = parseInt(rootNote.slice(-1), 10); // e.g., 4, 5
 
 		// Build major 7th chord: root, major 3rd, perfect 5th, major 7th
 		const chord = this.buildMajor7Chord(noteName, octave);

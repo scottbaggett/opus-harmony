@@ -1,0 +1,176 @@
+<file path="App.tsx">
+import 'react'
+import './components/SightReadingGame'
+import './components/NoteIdentificationGame'
+import './types'
+import './services/geminiService'
+import './config/levels'
+export default
+</file>
+
+<file path="constants.ts">
+export const COLORS: { background: string; surface: string; surfaceLight: string; primary: string; accent: string; text: string; textMuted: string; noteColors: string[]; } = {
+	background: "#0f0e11",
+	surface: "#17161b",
+	surfaceLight: "#232128",
+	primary: "#a855f7", // Purple
+	accent: "#fbbf24", // Gold
+	text: "#f3f4f6",
+	textMuted: "#9ca3af",
+	noteColors: [
+		"#8b5cf6", // Violet
+		"#ec4899", // Pink
+		"#f43f5e", // Rose
+		"#d946ef", // Fuchsia
+		"#a855f7", // Purple
+	],
+}
+export const INITIAL_RHYTHM_LEVEL: any = {
+	bpm: 90,
+	timeSignature: [4, 4],
+	notes: Array.from({ length: 32 }).map((_, i) => ({
+		id: `n-${i}`,
+		pitch: "C4",
+		duration: 1,
+		startTime: i * 0.5,
+		lane: Math.floor(Math.random() * 3) + 1, // Lanes 1-3
+		type: "melody",
+		color: COLORS.noteColors[i % COLORS.noteColors.length],
+	})),
+}
+</file>
+
+<file path="index.tsx">
+import 'react'
+import 'react-dom/client'
+import './App'
+</file>
+
+<file path="types.ts">
+export interface Note {
+}
+export interface TheoryResponse {
+}
+export interface PlayerStats {
+}
+export enum ViewMode
+export enum GameState
+</file>
+
+<file path="vite.config.ts">
+import '@vitejs/plugin-react'
+import 'path'
+import 'vite'
+export default
+</file>
+
+<file path="components/HarmonyExplorer.tsx">
+import 'react'
+export default
+</file>
+
+<file path="components/Navigation.tsx">
+import 'react'
+import '../types'
+export default
+</file>
+
+<file path="components/NoteIdentificationGame.tsx">
+import 'pixi.js'
+import 'react'
+import '../types'
+import 'gsap'
+import 'gsap/PixiPlugin'
+import '../services/soundEngine'
+import '../config/levels'
+export default
+</file>
+
+<file path="components/RhythmCanvas.tsx">
+import 'react'
+import '../constants'
+import '../types'
+export default
+</file>
+
+<file path="components/SightReadingGame.tsx">
+import 'pixi.js'
+import 'react'
+import 'react'
+import '../constants'
+import '../types'
+export default
+</file>
+
+<file path="config/levels.ts">
+export interface LevelConfig {
+}
+export const LEVELS: LevelConfig[] = [
+export const getNextLevel = (currentLevel: number): LevelConfig | null =>
+export const getCurrentLevelConfig = (level: number): LevelConfig =>
+</file>
+
+<file path="services/geminiService.ts">
+import '@google/genai'
+import '../types'
+export const generatePracticeDrill: (difficulty: string) => Promise<string> = async (difficulty: string): Promise<string> => {
+	try {
+		const response = await genAI.models.generateContent({
+			model: "gemini-2.5-flash",
+			contents: `Generate a short 4-bar rhythm pattern description for a ${difficulty} level student. describe it in text only.`,
+		});
+		return response.text || "Simple 4/4 time march.";
+	} catch (e) {
+		return "Simple 4/4 time march.";
+	}
+}
+export const getMaestroAdvice: (mode: import("/types").ViewMode, context: string) => Promise<import("/types").TheoryResponse> = async (
+	mode: ViewMode,
+	context: string
+): Promise<TheoryResponse> => {
+	try {
+		const modelId = "gemini-2.5-flash";
+
+		const prompt = `You are a strict but encouraging Classical Music Maestro from the Baroque era.
+    The student is currently studying ${mode}. 
+    Context/State of the app: ${context}.
+    
+    Provide a brief, elegant piece of music theory advice or a historical anecdote related to this topic.
+    Keep it under 50 words.
+    Use a sophisticated tone.
+    `;
+
+		const response = await genAI.models.generateContent({
+			model: modelId,
+			contents: prompt,
+			config: {
+				responseMimeType: "application/json",
+				responseSchema: {
+					type: Type.OBJECT,
+					properties: {
+						explanation: { type: Type.STRING },
+						tip: { type: Type.STRING },
+					},
+				},
+			},
+		});
+
+		if (response.text) {
+			return JSON.parse(response.text) as TheoryResponse;
+		}
+
+		throw new Error("No response text");
+	} catch (error) {
+		console.error("Gemini Service Error:", error);
+		return {
+			explanation: "The muses are silent at the moment. Focus on your rhythm.",
+			tip: "Keep practicing.",
+		};
+	}
+}
+</file>
+
+<file path="services/soundEngine.ts">
+import 'tone'
+export const soundEngine: SoundEngine = new SoundEngine()
+</file>

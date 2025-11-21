@@ -1,10 +1,10 @@
-import { Application, BlurFilter, Container, Graphics, Text } from "pixi.js";
-import { type FC, useCallback, useEffect, useRef, useState } from "react";
-import { GameState } from "../types";
 import { gsap } from "gsap";
 import { PixiPlugin } from "gsap/PixiPlugin";
+import { Application, BlurFilter, Container, Graphics, Text } from "pixi.js";
+import { type FC, useCallback, useEffect, useRef, useState } from "react";
+import { getCurrentLevelConfig, getNextLevel } from "../core/config/levels";
+import { GameState } from "../core/types";
 import { soundEngine } from "../services/soundEngine";
-import { LEVELS, getCurrentLevelConfig, getNextLevel } from "../config/levels";
 
 // Register PixiPlugin
 gsap.registerPlugin(PixiPlugin);
@@ -65,7 +65,9 @@ const NoteIdentificationGame: FC<NoteIdentificationGameProps> = ({ gameState, on
 	// Update available notes based on level configuration
 	useEffect(() => {
 		const levelConfig = getCurrentLevelConfig(level);
-		const notesForLevel = TREBLE_NOTES.filter((n) => levelConfig.availableNotes.includes(n.position));
+		const notesForLevel = TREBLE_NOTES.filter((n) =>
+			levelConfig.availableNotes.includes(n.position)
+		);
 		setAvailableNotes(notesForLevel);
 		console.log(`Level ${level}: ${levelConfig.name}`, notesForLevel);
 	}, [level]);
@@ -75,22 +77,116 @@ const NoteIdentificationGame: FC<NoteIdentificationGameProps> = ({ gameState, on
 		console.log("Note generation check:", {
 			gameState,
 			level,
-			availableNotes: availableNotes.map(n => n.name),
+			availableNotes: availableNotes.map((n) => n.name),
 			hasCurrentNote: !!currentNote,
 		});
 		if (gameState === GameState.PLAYING && availableNotes.length > 0 && !currentNote) {
-			console.log("Generating new note from:", availableNotes.map(n => n.name));
+			console.log(
+				"Generating new note from:",
+				availableNotes.map((n) => n.name)
+			);
 			const randomNote = availableNotes[Math.floor(Math.random() * availableNotes.length)];
 			console.log("Selected note:", randomNote);
 			setCurrentNote(randomNote);
 		}
-	}, [gameState, level, availableNotes.length, currentNote]);
+	}, [
+		gameState,
+		level,
+		availableNotes.length,
+		currentNote,
+		availableNotes[Math.floor(Math.random() * availableNotes.length)],
+		availableNotes.map,
+	]);
 
-	const createNewNote = useCallback(() => {
+	const _createNewNote = useCallback(() => {
 		if (availableNotes.length === 0) return;
 		const randomNote = availableNotes[Math.floor(Math.random() * availableNotes.length)];
 		setCurrentNote(randomNote);
 	}, [availableNotes]);
+
+	const handleNoteSelection = (selectedNote: string) => {
+		if (!currentNote || feedback !== null) return;
+
+		console.log("Note selected:", selectedNote, "Current note:", currentNote.name);
+
+		if (selectedNote === currentNote.name) {
+			// Correct!
+			setFeedback("correct");
+			scoreRef.current += 10;
+			streakRef.current += 1;
+
+			// Play success sound - major 7th chord based on the note that was hit
+			soundEngine.playSuccess(currentNote.displayName);
+
+			// Animate note exit (success)
+			if (currentNoteGraphicRef.current) {
+				gsap.to(currentNoteGraphicRef.current.scale, {
+					x: 1.3,
+					y: 1.3,
+					duration: 0.3,
+					ease: "back.out(2)",
+				});
+				gsap.to(currentNoteGraphicRef.current, {
+					pixi: { alpha: 0 },
+					duration: 0.3,
+					ease: "power2.in",
+				});
+			}
+
+			// Check for level up based on score
+			const currentLevelConfig = getCurrentLevelConfig(level);
+			const nextLevelConfig = getNextLevel(level);
+
+			if (nextLevelConfig && scoreRef.current >= currentLevelConfig.requiredScore) {
+				console.log(`Level up! ${level} → ${nextLevelConfig.id}`);
+				// Show level up celebration
+				setShowLevelUp(true);
+
+				// Don't generate new note during level transition
+				setTimeout(() => {
+					setShowLevelUp(false);
+					setLevel(nextLevelConfig.id);
+					// Clear note AFTER level changes so new level's notes are used
+					setTimeout(() => {
+						setCurrentNote(null);
+						setFeedback(null);
+					}, 100);
+				}, 2000);
+			} else {
+				// Normal flow - clear current note to get next one
+				setTimeout(() => {
+					console.log("Clearing current note to trigger new note generation");
+					setCurrentNote(null); // Clear first
+					setFeedback(null); // Then clear feedback
+				}, 600);
+			}
+
+			onScoreUpdate(scoreRef.current, streakRef.current, level);
+		} else {
+			// Incorrect
+			setFeedback("incorrect");
+			streakRef.current = 0;
+			onScoreUpdate(scoreRef.current, 0, level);
+
+			// Play error sound
+			soundEngine.playError();
+
+			// Shake animation for wrong answer
+			if (currentNoteGraphicRef.current) {
+				gsap.to(currentNoteGraphicRef.current, {
+					pixi: { x: currentNoteGraphicRef.current.x + 10 },
+					duration: 0.05,
+					yoyo: true,
+					repeat: 5,
+					ease: "power1.inOut",
+				});
+			}
+
+			setTimeout(() => {
+				setFeedback(null);
+			}, 600);
+		}
+	};
 
 	// Initialize PixiJS
 	useEffect(() => {
@@ -142,11 +238,11 @@ const NoteIdentificationGame: FC<NoteIdentificationGameProps> = ({ gameState, on
 			staffGlow.filters = [blur];
 			staffLayer.addChild(staffGlow);
 
-			// Draw 5 staff lines
+			// Draw 5 staff lines - full width
 			for (let i = 0; i < 5; i++) {
 				const line = new Graphics();
-				line.moveTo(200, 0);
-				line.lineTo(app.screen.width - 200, 0);
+				line.moveTo(0, 0);
+				line.lineTo(app.screen.width, 0);
 				line.stroke({ width: 2, color: 0x666666 });
 				line.y = startY + i * STAFF_LINE_SPACING;
 				staffLayer.addChild(line);
@@ -294,45 +390,149 @@ const NoteIdentificationGame: FC<NoteIdentificationGameProps> = ({ gameState, on
 		gsap.killTweensOf(feedbackLayer.children);
 		feedbackLayer.removeChildren();
 
+		let animationId: number | null = null;
+		let isActive = true;
+
 		if (feedback) {
 			if (feedback === "correct") {
-				// Success: Radial burst effect
-				const particles: Graphics[] = [];
-				const particleCount = 12;
-				const centerX = app.screen.width / 2;
-				const centerY = app.screen.height / 2;
+				// Explosive physics-based particle effect
+				const particles: Array<{
+					graphic: Graphics;
+					vx: number;
+					vy: number;
+					rotationSpeed: number;
+					size: number;
+					life: number;
+					maxLife: number;
+				}> = [];
+				const particleCount = 30 + Math.floor(Math.random() * 25); // Random between 30-54 particles
+				// Use note position as center
+				const centerX = currentNoteGraphicRef.current?.x ?? app.screen.width / 2;
+				const centerY = currentNoteGraphicRef.current?.y ?? app.screen.height / 2;
+				// Use note color
+				const noteColor = currentNote?.color ?? 0x22c55e;
 
+				// Physics constants with more randomness
+				const gravity = 600 + Math.random() * 400; // Random gravity between 600-1000
+				const minSpeed = 200;
+				const maxSpeed = 700;
+				const rotationSpeedRange = 8; // More rotation variation
+
+				// Create particles with completely random physics properties
 				for (let i = 0; i < particleCount; i++) {
+					// Completely random angle (not evenly distributed)
+					const angle = Math.random() * Math.PI * 2;
+					// Random speed across full range
+					const speed = minSpeed + Math.random() * (maxSpeed - minSpeed);
+					// More size variation
+					const size = 5 + Math.random() * 18; // Random size between 5-23
+					// Random initial position spread around center
+					const initialSpread = 20;
+					const startX = centerX + (Math.random() - 0.5) * initialSpread;
+					const startY = centerY + (Math.random() - 0.5) * initialSpread;
+					// Random upward bias
+					const upwardBias = -50 - Math.random() * 150;
+
+					// Random shape (circle, square, or triangle)
+					const shapeType = Math.random();
 					const particle = new Graphics();
-					particle.circle(0, 0, 15);
-					particle.fill({ color: 0x22c55e, alpha: 0.7 });
-					particle.x = centerX;
-					particle.y = centerY;
+
+					if (shapeType < 0.4) {
+						// Circle
+						particle.circle(0, 0, size);
+					} else if (shapeType < 0.8) {
+						// Square
+						particle.rect(-size, -size, size * 2, size * 2);
+					} else {
+						// Triangle
+						const points = [
+							{ x: 0, y: -size },
+							{ x: -size * 0.866, y: size * 0.5 },
+							{ x: size * 0.866, y: size * 0.5 },
+						];
+						particle.poly(points);
+					}
+
+					particle.fill({ color: noteColor, alpha: 0.7 + Math.random() * 0.3 });
+					particle.x = startX;
+					particle.y = startY;
+					particle.rotation = Math.random() * Math.PI * 2;
 					feedbackLayer.addChild(particle);
-					particles.push(particle);
 
-					const angle = (Math.PI * 2 * i) / particleCount;
-					const distance = 200;
-
-					gsap.to(particle, {
-						pixi: {
-							x: centerX + Math.cos(angle) * distance,
-							y: centerY + Math.sin(angle) * distance,
-							alpha: 0,
-							scale: 0.5,
-						},
-						duration: 0.6,
-						ease: "power2.out",
-						onComplete: () => {
-							particle.destroy();
-						},
+					particles.push({
+						graphic: particle,
+						vx: Math.cos(angle) * speed,
+						vy: Math.sin(angle) * speed + upwardBias,
+						rotationSpeed: (Math.random() - 0.5) * rotationSpeedRange,
+						size,
+						life: 1.0,
+						maxLife: 1.0,
 					});
 				}
 
-				// Gentle green flash overlay
+				// Physics animation loop with random duration
+				const startTime = performance.now();
+				const duration = 0.9 + Math.random() * 0.6; // Random duration between 0.9-1.5 seconds
+				const damping = 0.96 + Math.random() * 0.03; // Random damping between 0.96-0.99
+				let lastTime = startTime;
+
+				const animate = (currentTime: number) => {
+					if (!isActive) return;
+
+					const deltaTime = (currentTime - lastTime) / 1000; // Convert to seconds
+					lastTime = currentTime;
+					const elapsed = (currentTime - startTime) / 1000;
+					const progress = Math.min(elapsed / duration, 1);
+
+					// Update each particle
+					for (let i = particles.length - 1; i >= 0; i--) {
+						const p = particles[i];
+
+						// Apply gravity
+						p.vy += gravity * deltaTime;
+
+						// Apply air resistance (damping)
+						p.vx *= damping;
+						p.vy *= damping;
+
+						// Update position
+						p.graphic.x += p.vx * deltaTime;
+						p.graphic.y += p.vy * deltaTime;
+
+						// Update rotation
+						p.graphic.rotation += p.rotationSpeed * deltaTime;
+
+						// Fade out based on life
+						p.life = 1 - progress;
+						p.graphic.alpha = p.life * 0.9;
+
+						// Scale down as it fades
+						p.graphic.scale.set(p.life);
+
+						// Remove if dead or off screen
+						if (p.life <= 0 || p.graphic.y > app.screen.height + 100) {
+							p.graphic.destroy();
+							particles.splice(i, 1);
+						}
+					}
+
+					if (progress < 1 && particles.length > 0 && isActive) {
+						animationId = requestAnimationFrame(animate);
+					} else {
+						// Clean up remaining particles
+						for (const p of particles) {
+							p.graphic.destroy();
+						}
+						animationId = null;
+					}
+				};
+
+				animationId = requestAnimationFrame(animate);
+
+				// Gentle flash overlay using note color
 				const overlay = new Graphics();
 				overlay.rect(0, 0, app.screen.width, app.screen.height);
-				overlay.fill({ color: 0x22c55e, alpha: 0 });
+				overlay.fill({ color: noteColor, alpha: 0 });
 				feedbackLayer.addChild(overlay);
 
 				gsap
@@ -374,7 +574,15 @@ const NoteIdentificationGame: FC<NoteIdentificationGameProps> = ({ gameState, on
 					});
 			}
 		}
-	}, [feedback, isReady]);
+
+		// Cleanup function
+		return () => {
+			isActive = false;
+			if (animationId !== null) {
+				cancelAnimationFrame(animationId);
+			}
+		};
+	}, [feedback, isReady, currentNote]);
 
 	// Keyboard input handler
 	useEffect(() => {
@@ -391,91 +599,7 @@ const NoteIdentificationGame: FC<NoteIdentificationGameProps> = ({ gameState, on
 
 		window.addEventListener("keypress", handleKeyPress);
 		return () => window.removeEventListener("keypress", handleKeyPress);
-	}, [availableNotes, currentNote, feedback]);
-
-	const handleNoteSelection = (selectedNote: string) => {
-		if (!currentNote || feedback !== null) return;
-
-		console.log("Note selected:", selectedNote, "Current note:", currentNote.name);
-
-		if (selectedNote === currentNote.name) {
-			// Correct!
-			setFeedback("correct");
-			scoreRef.current += 10;
-			streakRef.current += 1;
-
-			// Play success sound - major 7th chord based on the note that was hit
-			soundEngine.playSuccess(currentNote.displayName);
-
-			// Animate note exit (success)
-			if (currentNoteGraphicRef.current) {
-				gsap.to(currentNoteGraphicRef.current.scale, {
-					x: 1.3,
-					y: 1.3,
-					duration: 0.3,
-					ease: "back.out(2)",
-				});
-				gsap.to(currentNoteGraphicRef.current, {
-					pixi: { alpha: 0 },
-					duration: 0.3,
-					ease: "power2.in",
-				});
-			}
-
-			// Check for level up based on score
-			const currentLevelConfig = getCurrentLevelConfig(level);
-			const nextLevelConfig = getNextLevel(level);
-
-			if (nextLevelConfig && scoreRef.current >= currentLevelConfig.requiredScore) {
-				console.log(`Level up! ${level} → ${nextLevelConfig.id}`);
-				// Show level up celebration
-				setShowLevelUp(true);
-
-				// Don't generate new note during level transition
-				setTimeout(() => {
-					setShowLevelUp(false);
-					setLevel(nextLevelConfig.id);
-					// Clear note AFTER level changes so new level's notes are used
-					setTimeout(() => {
-						setCurrentNote(null);
-						setFeedback(null);
-					}, 100);
-				}, 2000);
-			} else {
-				// Normal flow - clear current note to get next one
-				setTimeout(() => {
-					console.log("Clearing current note to trigger new note generation");
-					setCurrentNote(null); // Clear first
-					setFeedback(null); // Then clear feedback
-				}, 600);
-			}
-
-			onScoreUpdate(scoreRef.current, streakRef.current, level);
-		} else {
-			// Incorrect
-			setFeedback("incorrect");
-			streakRef.current = 0;
-			onScoreUpdate(scoreRef.current, 0, level);
-
-			// Play error sound
-			soundEngine.playError();
-
-			// Shake animation for wrong answer
-			if (currentNoteGraphicRef.current) {
-				gsap.to(currentNoteGraphicRef.current, {
-					pixi: { x: currentNoteGraphicRef.current.x + 10 },
-					duration: 0.05,
-					yoyo: true,
-					repeat: 5,
-					ease: "power1.inOut",
-				});
-			}
-
-			setTimeout(() => {
-				setFeedback(null);
-			}, 600);
-		}
-	};
+	}, [availableNotes, currentNote, feedback, handleNoteSelection]);
 
 	return (
 		<div className="absolute inset-0 w-full h-full">
@@ -548,9 +672,7 @@ const NoteIdentificationGame: FC<NoteIdentificationGameProps> = ({ gameState, on
 						<h2 className="text-6xl font-serif text-amber-400 drop-shadow-[0_0_20px_rgba(251,191,36,0.5)]">
 							Level Up!
 						</h2>
-						<p className="text-2xl text-gray-300">
-							{getNextLevel(level)?.name}
-						</p>
+						<p className="text-2xl text-gray-300">{getNextLevel(level)?.name}</p>
 						<p className="text-sm text-gray-500 uppercase tracking-widest">
 							{getNextLevel(level)?.description}
 						</p>

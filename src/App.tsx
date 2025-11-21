@@ -1,9 +1,10 @@
-import React, { useState } from "react";
-import SightReadingGame from "./components/SightReadingGame";
+import type React from "react";
+import { useState } from "react";
 import NoteIdentificationGame from "./components/NoteIdentificationGame";
-import { GameState, TheoryResponse, ViewMode } from "./types";
+import SightReadingGame from "./components/SightReadingGame";
+import { getCurrentLevelConfig, getNextLevel } from "./core/config/levels";
+import { GameState, type TheoryResponse, ViewMode } from "./core/types";
 import { getMaestroAdvice } from "./services/geminiService";
-import { getCurrentLevelConfig, getNextLevel } from "./config/levels";
 
 const App: React.FC = () => {
 	const [gameState, setGameState] = useState<GameState>(GameState.MENU);
@@ -98,7 +99,9 @@ const App: React.FC = () => {
 						</div>
 					) : (
 						<div className="text-xs text-gray-400 uppercase tracking-widest space-y-1">
-							<div>Level {level}: {getCurrentLevelConfig(level).name}</div>
+							<div>
+								Level {level}: {getCurrentLevelConfig(level).name}
+							</div>
 							{getNextLevel(level) && (
 								<div className="text-purple-400">
 									Next: {getCurrentLevelConfig(level).requiredScore - score} pts
@@ -124,6 +127,7 @@ const App: React.FC = () => {
 
 						<div className="flex gap-6">
 							<button
+								type="button"
 								onClick={() => handleStartGame("identification")}
 								className="group relative px-12 py-6 bg-transparent overflow-hidden rounded-full transition-all duration-500 hover:scale-105"
 							>
@@ -140,6 +144,7 @@ const App: React.FC = () => {
 							</button>
 
 							<button
+								type="button"
 								onClick={() => handleStartGame("rhythm")}
 								className="group relative px-12 py-6 bg-transparent overflow-hidden rounded-full transition-all duration-500 hover:scale-105"
 							>
@@ -228,13 +233,15 @@ const App: React.FC = () => {
 
 						<div className="flex gap-4">
 							<button
-								onClick={handleStartGame}
+								type="button"
+								onClick={() => handleStartGame()}
 								className="flex-1 py-4 bg-white text-black rounded-xl font-serif text-xl italic hover:bg-gray-200 transition-colors shadow-[0_0_20px_rgba(255,255,255,0.1)]"
 							>
 								Play Again
 							</button>
 
 							<button
+								type="button"
 								onClick={() => setGameState(GameState.MENU)}
 								className="px-6 py-4 bg-white/5 hover:bg-white/10 text-white rounded-xl font-serif text-xl italic transition-colors border border-white/10"
 							>
